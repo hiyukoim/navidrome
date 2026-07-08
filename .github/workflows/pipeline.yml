@@ -434,6 +434,7 @@ jobs:
   msi:
     name: Build Windows installers
     needs: [build, git-version]
+    if: needs.git-version.outputs.git_tag != ''
     runs-on: ubuntu-24.04
 
     steps:
