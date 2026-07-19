@@ -40,3 +40,6 @@ openspec/
 .agents
 go.work*
 .worktrees/
+# Personal deploy helpers / local ops (never commit host-specific paths)
+scripts/deploy-fork-image-to-hetzner.sh
+scripts/deploy-*.local.sh

@@ -45,7 +45,7 @@ var _ = Describe("auth_router", func() {
 			secret:      "SECRET",
 			sessionKeys: &agents.SessionKeys{DataStore: ds, KeyName: sessionKeyProperty},
 		}
-		router.client = newClient(router.apiKey, router.secret, httpClient)
+		router.client = newClient(router.apiKey, router.secret, "https://ws.audioscrobbler.com/2.0/", httpClient)
 		router.Handler = router.routes()
 	})
 

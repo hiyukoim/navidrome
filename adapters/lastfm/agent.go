@@ -64,7 +64,7 @@ func lastFMConstructor(ds model.DataStore) *lastfmAgent {
 	}
 	chc := cache.NewHTTPClient(hc, consts.DefaultHttpClientTimeOut)
 	l.httpClient = chc
-	l.client = newClient(l.apiKey, l.secret, chc)
+	l.client = newClient(l.apiKey, l.secret, conf.Server.LastFM.BaseURL, chc)
 	return l
 }
 
@@ -353,6 +353,20 @@ func (l *lastfmAgent) getArtistForScrobble(track *model.MediaFile, role model.Ro
 	return displayName
 }
 
+func (l *lastfmAgent) getSortArtistForScrobble(track *model.MediaFile, role model.Role) string {
+	if conf.Server.LastFM.ScrobbleFirstArtistOnly && len(track.Participants[role]) > 0 {
+		return track.Participants[role][0].SortArtistName
+	}
+	switch role {
+	case model.RoleArtist:
+		return track.SortArtistName
+	case model.RoleAlbumArtist:
+		return track.SortAlbumArtistName
+	default:
+		return ""
+	}
+}
+
 func (l *lastfmAgent) NowPlaying(ctx context.Context, userId string, track *model.MediaFile, position int) error {
 	sk, err := l.sessionKeys.Get(ctx, userId)
 	if err != nil || sk == "" {
@@ -360,13 +374,15 @@ func (l *lastfmAgent) NowPlaying(ctx context.Context, userId string, track *mode
 	}
 
 	err = l.client.updateNowPlaying(ctx, sk, ScrobbleInfo{
-		artist:      l.getArtistForScrobble(track, model.RoleArtist, track.Artist),
-		track:       track.Title,
-		album:       track.Album,
-		trackNumber: track.TrackNumber,
-		mbid:        track.MbzRecordingID,
-		duration:    int(track.Duration),
-		albumArtist: l.getArtistForScrobble(track, model.RoleAlbumArtist, track.AlbumArtist),
+		artist:          l.getArtistForScrobble(track, model.RoleArtist, track.Artist),
+		track:           track.Title,
+		album:           track.Album,
+		trackNumber:     track.TrackNumber,
+		mbid:            track.MbzRecordingID,
+		duration:        int(track.Duration),
+		albumArtist:     l.getArtistForScrobble(track, model.RoleAlbumArtist, track.AlbumArtist),
+		sortArtist:      l.getSortArtistForScrobble(track, model.RoleArtist),
+		sortAlbumArtist: l.getSortArtistForScrobble(track, model.RoleAlbumArtist),
 	})
 	if err != nil {
 		log.Warn(ctx, "Last.fm client.updateNowPlaying returned error", "track", track.Title, err)
@@ -386,14 +402,16 @@ func (l *lastfmAgent) Scrobble(ctx context.Context, userId string, s scrobbler.S
 		return nil
 	}
 	err = l.client.scrobble(ctx, sk, ScrobbleInfo{
-		artist:      l.getArtistForScrobble(&s.MediaFile, model.RoleArtist, s.Artist),
-		track:       s.Title,
-		album:       s.Album,
-		trackNumber: s.TrackNumber,
-		mbid:        s.MbzRecordingID,
-		duration:    int(s.Duration),
-		albumArtist: l.getArtistForScrobble(&s.MediaFile, model.RoleAlbumArtist, s.AlbumArtist),
-		timestamp:   s.TimeStamp,
+		artist:          l.getArtistForScrobble(&s.MediaFile, model.RoleArtist, s.Artist),
+		track:           s.Title,
+		album:           s.Album,
+		trackNumber:     s.TrackNumber,
+		mbid:            s.MbzRecordingID,
+		duration:        int(s.Duration),
+		albumArtist:     l.getArtistForScrobble(&s.MediaFile, model.RoleAlbumArtist, s.AlbumArtist),
+		sortArtist:      l.getSortArtistForScrobble(&s.MediaFile, model.RoleArtist),
+		sortAlbumArtist: l.getSortArtistForScrobble(&s.MediaFile, model.RoleAlbumArtist),
+		timestamp:       s.TimeStamp,
 	})
 	if err == nil {
 		return nil

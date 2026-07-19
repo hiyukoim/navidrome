@@ -14,11 +14,8 @@ import (
 	"strings"
 	"time"
 
+	"github.com/navidrome/navidrome/consts"
 	"github.com/navidrome/navidrome/log"
-)
-
-const (
-	apiBaseUrl = "https://ws.audioscrobbler.com/2.0/"
 )
 
 type lastFMError struct {
@@ -34,14 +31,15 @@ type httpDoer interface {
 	Do(req *http.Request) (*http.Response, error)
 }
 
-func newClient(apiKey string, secret string, hc httpDoer) *client {
-	return &client{apiKey, secret, hc}
+func newClient(apiKey string, secret string, baseURL string, hc httpDoer) *client {
+	return &client{apiKey, secret, normalizeLastFMBaseURL(baseURL), hc}
 }
 
 type client struct {
-	apiKey string
-	secret string
-	hc     httpDoer
+	apiKey  string
+	secret  string
+	baseURL string
+	hc      httpDoer
 }
 
 func (c *client) albumGetInfo(ctx context.Context, name string, artist string, mbid string, lang string) (*Album, error) {
@@ -130,19 +128,19 @@ func (c *client) getSession(ctx context.Context, token string) (string, error) {
 }
 
 type ScrobbleInfo struct {
-	artist      string
-	track       string
-	album       string
-	trackNumber int
-	mbid        string
-	duration    int
-	albumArtist string
-	timestamp   time.Time
+	artist          string
+	track           string
+	album           string
+	trackNumber     int
+	mbid            string
+	duration        int
+	albumArtist     string
+	sortArtist      string
+	sortAlbumArtist string
+	timestamp       time.Time
 }
 
-func (c *client) updateNowPlaying(ctx context.Context, sessionKey string, info ScrobbleInfo) error {
-	params := url.Values{}
-	params.Add("method", "track.updateNowPlaying")
+func addScrobbleParams(params url.Values, info ScrobbleInfo) {
 	params.Add("artist", info.artist)
 	params.Add("track", info.track)
 	params.Add("album", info.album)
@@ -150,6 +148,20 @@ func (c *client) updateNowPlaying(ctx context.Context, sessionKey string, info S
 	params.Add("mbid", info.mbid)
 	params.Add("duration", strconv.Itoa(info.duration))
 	params.Add("albumArtist", info.albumArtist)
+	// Private helper fields for an optional Last.fm alias proxy. Stripped before
+	// upstream Last.fm sees them; included in the signature sent to the proxy.
+	if info.sortArtist != "" {
+		params.Add("nd_sortArtist", info.sortArtist)
+	}
+	if info.sortAlbumArtist != "" {
+		params.Add("nd_sortAlbumArtist", info.sortAlbumArtist)
+	}
+}
+
+func (c *client) updateNowPlaying(ctx context.Context, sessionKey string, info ScrobbleInfo) error {
+	params := url.Values{}
+	params.Add("method", "track.updateNowPlaying")
+	addScrobbleParams(params, info)
 	params.Add("sk", sessionKey)
 	resp, err := c.makeRequest(ctx, http.MethodPost, params, true)
 	if err != nil {
@@ -166,13 +178,7 @@ func (c *client) scrobble(ctx context.Context, sessionKey string, info ScrobbleI
 	params := url.Values{}
 	params.Add("method", "track.scrobble")
 	params.Add("timestamp", strconv.FormatInt(info.timestamp.Unix(), 10))
-	params.Add("artist", info.artist)
-	params.Add("track", info.track)
-	params.Add("album", info.album)
-	params.Add("trackNumber", strconv.Itoa(info.trackNumber))
-	params.Add("mbid", info.mbid)
-	params.Add("duration", strconv.Itoa(info.duration))
-	params.Add("albumArtist", info.albumArtist)
+	addScrobbleParams(params, info)
 	params.Add("sk", sessionKey)
 	resp, err := c.makeRequest(ctx, http.MethodPost, params, true)
 	if err != nil {
@@ -200,10 +206,10 @@ func (c *client) makeRequest(ctx context.Context, method string, params url.Valu
 	var req *http.Request
 	if method == http.MethodPost {
 		body := strings.NewReader(params.Encode())
-		req, _ = http.NewRequestWithContext(ctx, method, apiBaseUrl, body)
+		req, _ = http.NewRequestWithContext(ctx, method, c.baseURL, body)
 		req.Header.Set("Content-Type", "application/x-www-form-urlencoded")
 	} else {
-		req, _ = http.NewRequestWithContext(ctx, method, apiBaseUrl, nil)
+		req, _ = http.NewRequestWithContext(ctx, method, c.baseURL, nil)
 		req.URL.RawQuery = params.Encode()
 	}
 
@@ -229,6 +235,17 @@ func (c *client) makeRequest(ctx context.Context, method string, params url.Valu
 	}
 
 	return &response, nil
+}
+
+func normalizeLastFMBaseURL(baseURL string) string {
+	baseURL = strings.TrimSpace(baseURL)
+	if baseURL == "" {
+		return consts.DefaultLastFMBaseURL
+	}
+	if !strings.HasSuffix(baseURL, "/") {
+		return baseURL + "/"
+	}
+	return baseURL
 }
 
 func (c *client) sign(params url.Values) {

@@ -1,0 +1,16 @@
+# Example Last.fm alias proxy rules (YAML).
+# Copy to an untracked rules.yaml / mount in Coolify persistent storage.
+# Invalid YAML logs a warning and keeps the previous loaded rules.
+
+artist_aliases:
+  Example Artist: Example Alias
+
+# When Navidrome sends nd_sortArtist / nd_sortAlbumArtist, use those values
+# for the listed display names. Manual artist_aliases above take priority.
+use_sort_artist:
+  - Example Sort Display Artist
+
+album_rules:
+  - id: example-ost
+    album: Example Soundtrack
+    album_artist: Example Cast
