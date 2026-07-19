@@ -1,0 +1,11 @@
+# Local alias maps, secrets, and deploy helpers (do not track)
+aliases.json
+rules.json
+rules.yaml
+*.local.json
+*.local.yaml
+.env
+.env.*
+deploy-*.sh
+lastfm-alias-proxy
+lastfm-alias-proxy-linux-amd64

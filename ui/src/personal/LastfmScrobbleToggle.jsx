@@ -65,6 +65,7 @@ export const LastfmScrobbleToggle = (props) => {
   const [linked, setLinked] = useState(null)
   const [checkingLink, setCheckingLink] = useState(false)
   const [apiKey, setApiKey] = useState(false)
+  const [authUrl, setAuthUrl] = useState('https://www.last.fm/api/auth/')
   const openedTab = useRef()
 
   useEffect(() => {
@@ -72,6 +73,9 @@ export const LastfmScrobbleToggle = (props) => {
       .then((response) => {
         setLinked(response.json.status === true)
         setApiKey(response.json.apiKey)
+        if (response.json.authUrl) {
+          setAuthUrl(response.json.authUrl)
+        }
       })
       .catch(() => {
         setLinked(false)
@@ -102,7 +106,7 @@ export const LastfmScrobbleToggle = (props) => {
           `/api/lastfm/link/callback?uid=${encodeURIComponent(linkToken)}`,
         )
         const callbackUrl = `${window.location.origin}${callbackEndpoint}`
-        tab.location.href = `https://www.last.fm/api/auth/?api_key=${apiKey}&cb=${callbackUrl}`
+        tab.location.href = `${authUrl}?api_key=${apiKey}&cb=${callbackUrl}`
       })
       .catch(() => {
         tab?.close()
